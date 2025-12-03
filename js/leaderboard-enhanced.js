@@ -1,180 +1,13 @@
-const REPO_OWNER = 'sayeeg-11';
-const REPO_NAME = 'Pixel_Phantoms';
-const API_BASE = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}`;
-const EVENTS_DATA_URL = 'data/events.json';
-const XP_MULTIPLIER = 100;
+// Enhanced Leaderboard Features for Home Page Integration
 
-// Scoring System
-const POINTS = {
-    L3: 11,
-    L2: 5,
-    L1: 2,
-    DEFAULT: 1
-};
-
-// Event attendance points
-const EVENT_POINTS = 250;
-
-// League Definitions for Logic
-const LEAGUES = {
-    GOLD: { threshold: 15000, name: 'Gold Class', color: '#FFD700' },
-    SILVER: { threshold: 7500, name: 'Silver Class', color: '#C0C0C0' },
-    BRONZE: { threshold: 3000, name: 'Bronze Class', color: '#CD7F32' },
-    ROOKIE: { threshold: 0, name: 'Rookie Agent', color: '#00aaff' }
-};
-
-// Enhanced achievements for home page
+// Achievement tracking for home page preview
 const HOME_ACHIEVEMENTS = [
-    { id: 'first_pr', name: 'First PR', description: 'Submitted your first pull request', icon: 'fas fa-code-branch' },
-    { id: 'ten_prs', name: 'PR Master', description: 'Submitted 10 pull requests', icon: 'fas fa-code' },
-    { id: 'high_complexity', name: 'Complex Solver', description: 'Submitted a Level 3 PR', icon: 'fas fa-brain' },
-    { id: 'team_player', name: 'Team Player', description: 'Participated in 3 events', icon: 'fas fa-users' }
+    { id: 'early_bird', name: 'Early Bird', description: 'Joined in the first week', icon: 'fas fa-sun' },
+    { id: 'streak_master', name: 'Streak Master', description: 'Contributed for 7 days straight', icon: 'fas fa-fire' },
+    { id: 'community_champion', name: 'Community Champion', description: 'Helped 5 other contributors', icon: 'fas fa-hands-helping' }
 ];
 
-document.addEventListener('DOMContentLoaded', () => {
-    initLeaderboard();
-});
-
-async function initLeaderboard() {
-    const container = document.getElementById('lb-rows');
-    try {
-        const [pulls, eventsData] = await Promise.all([
-            fetchAllPulls(),
-            fetchEventsData()
-        ]);
-        
-        const scores = calculateScores(pulls, eventsData);
-        const topContributors = getTopContributors(scores);
-        
-        // Use the enhanced rendering function
-        renderHomeLeaderboard(topContributors);
-    } catch (error) {
-        console.error("Leaderboard Sync Failed:", error);
-        if(container) container.innerHTML = `<div style="padding:20px; text-align:center; color:#ff5f56;">Connection Lost. Retrying uplink...</div>`;
-    }
-}
-
-async function fetchAllPulls() {
-    let pulls = [];
-    let page = 1;
-    while (page <= 3) {
-        try {
-            const res = await fetch(`${API_BASE}/pulls?state=all&per_page=100&page=${page}`);
-            if (!res.ok) break;
-            const data = await res.json();
-            if (!data.length) break;
-            pulls = pulls.concat(data);
-            page++;
-        } catch (e) { break; }
-    }
-    return pulls;
-}
-
-async function fetchEventsData() {
-    try {
-        const res = await fetch(EVENTS_DATA_URL);
-        if (!res.ok) return [];
-        const data = await res.json();
-        return data;
-    } catch (e) {
-        console.warn("Failed to fetch events data:", e);
-        return [];
-    }
-}
-
-function calculateScores(pulls, eventsData) {
-    const statsMap = {};
-
-    // Process Pull Requests
-    pulls.forEach(pr => {
-        if (!pr.merged_at) return;
-
-        const user = pr.user.login;
-        if (user.toLowerCase() === REPO_OWNER.toLowerCase()) return;
-
-        if (!statsMap[user]) {
-            statsMap[user] = {
-                login: user,
-                xp: 0,
-                prCount: 0,
-                eventsAttended: 0,
-                avatar: pr.user.avatar_url,
-                achievements: {}
-            };
-        }
-
-        let prPoints = 0;
-        let hasLevel = false;
-        let hasHighComplexity = false;
-
-        pr.labels.forEach(label => {
-            const name = label.name.toLowerCase();
-            if (name.includes('level 3') || name.includes('level-3')) { 
-                prPoints += POINTS.L3; 
-                hasLevel = true; 
-                hasHighComplexity = true;
-            }
-            else if (name.includes('level 2') || name.includes('level-2')) { 
-                prPoints += POINTS.L2; 
-                hasLevel = true; 
-            }
-            else if (name.includes('level 1')) { 
-                prPoints += POINTS.L1; 
-                hasLevel = true; 
-            }
-        });
-
-        if (!hasLevel) prPoints += POINTS.DEFAULT;
-        
-        statsMap[user].xp += prPoints * XP_MULTIPLIER;
-        statsMap[user].prCount++;
-        
-        // Track achievements
-        if (statsMap[user].prCount === 1) {
-            statsMap[user].achievements['first_pr'] = true;
-        }
-        
-        if (statsMap[user].prCount === 10) {
-            statsMap[user].achievements['ten_prs'] = true;
-        }
-        
-        if (hasHighComplexity) {
-            statsMap[user].achievements['high_complexity'] = true;
-        }
-    });
-
-    // Process Events Attendance (mock data for demonstration)
-    // In a real implementation, this would come from a CSV or database
-    // For now, we'll simulate some event attendance
-    Object.keys(statsMap).forEach(user => {
-        // Simulate random event attendance for demo purposes
-        const eventsAttended = Math.floor(Math.random() * 5); // 0-4 events
-        statsMap[user].eventsAttended = eventsAttended;
-        statsMap[user].xp += eventsAttended * EVENT_POINTS;
-        
-        // Team player achievement
-        if (eventsAttended >= 3) {
-            statsMap[user].achievements['team_player'] = true;
-        }
-    });
-
-    return statsMap;
-}
-
-function getTopContributors(statsMap) {
-    return Object.values(statsMap)
-        .sort((a, b) => b.xp - a.xp)
-        .slice(0, 5); // Show Top 5 on Homepage
-}
-
-function getLeagueInfo(xp) {
-    if (xp >= LEAGUES.GOLD.threshold) return LEAGUES.GOLD;
-    if (xp >= LEAGUES.SILVER.threshold) return LEAGUES.SILVER;
-    if (xp >= LEAGUES.BRONZE.threshold) return LEAGUES.BRONZE;
-    return LEAGUES.ROOKIE;
-}
-
-// Enhanced rendering function that uses the new leaderboard-enhanced.js features
+// Enhanced rendering for home page leaderboard
 function renderHomeLeaderboard(contributors) {
     const container = document.getElementById('lb-rows');
     if (!container) return;
@@ -188,13 +21,12 @@ function renderHomeLeaderboard(contributors) {
 
     contributors.forEach((contributor, index) => {
         const rank = index + 1;
-        const league = getLeagueInfo(contributor.xp);
         
         const row = document.createElement('div');
         row.className = `lb-row rank-${rank}`;
         
         // Add activity indicator based on recent contributions
-        const activityIndicator = contributor.prCount > 3 ? '🔥' : (contributor.eventsAttended > 2 ? '⭐' : '');
+        const activityIndicator = contributor.prCount > 3 ? '🔥' : (contributor.events > 2 ? '⭐' : '');
         
         row.innerHTML = `
             <div class="lb-rank">
@@ -202,8 +34,8 @@ function renderHomeLeaderboard(contributors) {
             </div>
             <div class="lb-user-info">
                 <span class="lb-username">@${contributor.login} ${activityIndicator}</span>
-                <span class="lb-league-tag" style="color: ${league.color}">${league.name}</span>
-                <span class="lb-stats">${contributor.prCount} PRs • ${contributor.eventsAttended} Events</span>
+                <span class="lb-league-tag" style="color: ${getLeagueColor(contributor.xp)}">${getClassLabel(contributor.class)}</span>
+                <span class="lb-stats">${contributor.prCount} PRs • ${contributor.events} Events</span>
             </div>
             <div class="lb-xp-val">
                 ${contributor.xp.toLocaleString()} XP
@@ -239,7 +71,24 @@ function renderHomeLeaderboard(contributors) {
     container.appendChild(footer);
 }
 
-// Modal for home page leaderboard (simplified version)
+function getLeagueColor(xp) {
+    if (xp >= 15000) return '#FFD700'; // Gold
+    if (xp >= 7500) return '#C0C0C0';  // Silver
+    if (xp >= 3000) return '#CD7F32';  // Bronze
+    return '#00aaff'; // Rookie
+}
+
+function getClassLabel(className) {
+    const classLabels = {
+        'TITAN': 'Titan Class',
+        'STRIKER': 'Striker Class',
+        'SCOUT': 'Scout Class',
+        'ROOKIE': 'Rookie Class'
+    };
+    return classLabels[className] || className;
+}
+
+// Modal for home page leaderboard
 function openHomeModal(contributor) {
     // Create modal overlay if it doesn't exist
     let modal = document.getElementById('home-contributor-modal');
@@ -320,8 +169,8 @@ function openHomeModal(contributor) {
     document.getElementById('home-modal-rank').textContent = `#${contributor.rank || '--'}`;
     document.getElementById('home-modal-score').textContent = contributor.xp || 0;
     document.getElementById('home-modal-prs').textContent = contributor.prCount || 0;
-    document.getElementById('home-modal-events').textContent = contributor.eventsAttended || 0;
-    document.getElementById('home-modal-league-badge').textContent = getLeagueInfo(contributor.xp).name || 'Contributor';
+    document.getElementById('home-modal-events').textContent = contributor.events || 0;
+    document.getElementById('home-modal-league-badge').textContent = getClassLabel(contributor.class) || 'Contributor';
     
     // Progress bar
     const levelProgress = (contributor.xp % 1000) / 10; // Simple progress calculation

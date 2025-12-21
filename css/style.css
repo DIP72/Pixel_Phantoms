@@ -4109,4 +4109,13 @@ main:focus {
     bottom: 100px; 
 }
 
+/* FORCE social icons to always be visible */
+.footer-container,
+.footer-content,
+.social-links,
+.social-link {
+    opacity: 1 !important;
+    visibility: visible !important;
+    transform: none !important;
+}
 
